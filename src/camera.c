@@ -55,7 +55,9 @@ usage ( const char *progname ) {
     fprintf( stdout, "\t-d Path to video device\n" );
     fprintf( stdout, "\t-W Screen width\n" );
     fprintf( stdout, "\t-H Screen height\n" );
+    fprintf( stdout, "\t-f Run in fullscreen mode\n" );
     fprintf( stdout, "\t-h Print this help message\n" );
+
 
     exit(0);
 }
