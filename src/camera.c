@@ -19,8 +19,6 @@
 #define APP_NAME "Camera"
 #define NUMBUFS  16
 
-#define MAX(x,y) (((x)>(y))? (x) : (y))
-
 struct state {
     /* camera properties */    
     struct v4l2_capability cap;
@@ -131,9 +129,10 @@ init ( struct state *s, struct args *a ) {
     /* set up the camera's capture format */
     s->fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     s->fmt.fmt.pix.width = a->width;
-    s->fmt.fmt.pix.height = a->height;
-    s->fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
+    s->fmt.fmt.pix.height = a->height;    
     s->fmt.fmt.pix.field = V4L2_FIELD_ANY;
+    /* I guess you should query this from cap? */
+    s->fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV; 
 
     if ( ioctl(s->fd, VIDIOC_S_FMT, s->fmt) < 0 ) {
         fprintf( stderr, "%s cannot set format\n", a->videodevice );
@@ -258,6 +257,9 @@ handle_events ( struct state *s ) {
 
 static void
 render ( struct state *s ) {
+    void *pixels;
+    int pitch;
+
     /* dequeue the next frame from the camera */
     memset(&s->buf, 0, sizeof(struct v4l2_buffer));
     s->buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -266,11 +268,20 @@ render ( struct state *s ) {
         fprintf( stderr, "Failed to dequeue buffer %d\n", errno );
         return;
     }
+
+    SDL_LockTexture( s->texture, NULL, &pixels, &pitch );
     
-    /* copy camera buffer over to texture */ 
-    SDL_UpdateTexture( 
-        s->texture, NULL, s->mem[s->buf.index], s->width*sizeof(Uint16)
-    );
+    /* FIXME: Should be better behaviour to handle pixels size != 2 bytes */
+    if ( pitch/s->width != sizeof(Uint16) ) {
+        fprintf( stderr, "mismatch between texture size and buffer size\n" );
+    } else {
+        /* copy camera buffer over to texture */ 
+        memcpy( 
+            pixels, s->mem[s->buf.index], s->width*s->height*sizeof(Uint16) 
+        );
+    }
+
+    SDL_UnlockTexture( s->texture );
 
     /* queue next frame for this buffer */
     if ( ioctl( s->fd, VIDIOC_QBUF, &s->buf ) < 0 ) {
